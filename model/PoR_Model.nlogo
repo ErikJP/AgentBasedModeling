@@ -5,145 +5,217 @@ extensions [
 
 
 globals [
-  ; ENVIRONMENT
-  current-ccs-cost
-  electricity-price
-  oil-price
-  ccs-capacity
-  ccs-efficiency
-  co2-target
-
-  ; PORT OF ROTTERDAM
-  co2-storage-cost
-  infrastructure-subsidy-used
-  last-pipeline-type
-
-  ; GOVERNMENT
-  co2-emmision-cost
-  industry-subsidy-without-ccs
-  subsidy-available
-  percent-subsidy-given
-
-  ; INDUSTRIES
-  co2-emitted
-  co2-stored
-  co2-produced
-  connection-cost
-  co2-storage-cost-industries
-  industry-subsidy-used
-  electricity-consumption
-  ccs-electricity-requirements
-  co2-emission-from-oil
-  data-co2-emission-cost
-  data-co2-storage-cost
-]
-
-breed []
-breed []
-breed []
-undirected-link-breed []
-
-ports-of-rotterdam-own [
 
 ]
 
-industries-own [
+breed [Governments Government]
+breed [PoRs PoR] ; Port of Rotterdam
+breed [Industries Industry]
+breed [Storages Storage] ; Storage points
+undirected-link-breed [Pipelines Pipeline]
+
+Governments-own [
+  subsidy ; int [eur] - Total available subsidy
+  co2-price ; int [eur / ton of co2] - Price of CO2 emissions
+  oil-price ; int [eur / ton of oil] - Price of oil consumption
+  electricity-price ; int [eur / MWh] - Price of electricity
+]
+
+PoRs-own [
+  connection-price ; int [eur] - Cost to connect to pipeline (1000000 euros)
+  pipeline-availability ; double [ton of CO2 / yr] - Unused pipeline capacity
+  opex-extensible ; int [eur / ton of CO2] - Price that industries pay to use the extensible pipelines of the PoR
+  opex-fixed ; int [eur / ton of CO2] - Price that industries pay to use the fixed pipelines of the PoR
+  budget ; int [eur] - Port of Rotterdams budget
+]
+
+Industries-own [
+  oil-demand ; int [ton of oil / yr] - Oil demanded by industry
+  co2-emissions-oil ; double [ton of CO2 / ton of oil] - CO2 emitted per ton of oil by industry
+  co2-emissions ; double [ton of CO2] - CO2 emitted by industry (oil-demand*co2-emissions-oil)
+  opex-oil ; int [eur] - Operating expenditure for industry using oil in a given year
+           ; (oil-demand*oil-price + co2-emissions*co2-price)
+  capture-electricity ; int [MWh / ton of CO2] - Operating expenditure for industry to run capture with electricity
+  opex-capture-extensible ; int [eur] - Operating expenditure for industry using capture (extensible) in a given year
+               ; (opex-oil + electricity-price*CO2-emmissions*capture-electricity + CO2-emissions*opex-extensible)
+  opex-capture-fixed ; int [eur] - Operating expenditure for industry using capture (fixed) in a given year
+               ; (opex-oil + electricity-price*CO2-emmissions*capture-electricity + CO2-emissions*opex-fixed)
+  capex-capture ; int [eur / ton of CO2] - Capital expenditure for industry in a given year (200 eur / ton of CO2)
+  intent ; bool - Industries intent to build CCS (True=intend to build, False=no intent)
+  built ; bool - True if an industry has built CCS
+  payback-period ; int [yr] - How many years the industry wants to take to payback their investment
+]
+
+Storages-own [
 
 ]
 
-storage-points-own [
+Pipelines-own [
 
 ]
 
-pipelines-own [
-
-]
 
 to setup
   clear-all
   file-close-all
-
-  ask patches [set pcolor white]
-
-;;;;;;;;;;;; FIX ;;;;;;;;;;;;
-  set
-
-  file-open "co2-oil-price.csv"
-  let x csv:from-row file-read-line
 
   ask patches [ set pcolor blue - 0.25 - random-float 0.25 ] ; colour variation looks nice
   import-pcolors "PoR_map.png" ; import an image of the PoR landmass
   ask patches with [ not shade-of? blue pcolor ] [
     ; if you're not part of the ocean, you are part of the continent
     set pcolor green ; set landmass to be green
-]
+  ]
 
-  set-default-shape ports-of-rotterdam "house"
-  create-ports-of-rotterdam 1
-  [
+  ; Set PoR
+  set-default-shape PoRs "house"
+  create-PoRs 1 [
     set color yellow
     set size 6
     setxy -26 10
+
+    set connection-price 1000000 ; [eur]
+    set pipeline-availability 0 ; double [ton of CO2 / yr]
+    set opex-extensible 0.3 ; int [eur / ton of CO2]
+    set opex-fixed 0.21 ; int [eur / ton of CO2] (0.7*opex-extensible)
+    set budget 10000000 ; int [eur]
   ]
 
+  ; Set Government
+  create-Governments 1 [
+    set subsidy 15000000 ; int [eur]
+    file-open "co2-oil-price.csv"
+    if file-at-end? [ stop ]
+    let p csv:from-row file-read-line
+    set co2-price item 1 p ; int [eur / ton of co2]
+    set oil-price item 2 p ; int [eur / ton of oil]
+    set electricity-price 75 ; int [eur / MWh]
+  ]
+
+  ; Set Industries
   set-default-shape industries "house"
   ask n-of 25 patches with [ (pxcor > -40 and pxcor < 20) and (pycor > -15 and pycor < 20) ]
     [ sprout-industries 1 [
       set color black
       set size 3
 
+      set oil-demand random 900000 + 100000; int [ton of oil / yr]
+      set co2-emissions-oil 3.2 ; double [ton of CO2 / ton of oil]
+      set co2-emissions 0 ; double [ton of CO2]
+      set opex-oil 0 ; int [eur]
+      set capture-electricity 130 ; int [MWh / ton of CO2]
+      set opex-capture-extensible 0 ; int [eur]
+      set opex-capture-fixed 0 ; int [eur]
+      set capex-capture 200 ; int [eur / ton of CO2]
+      set intent False ; bool
+      set built False ; bool
+      set payback-period random 19 + 1; int [yr]
   ]]
 
-;;;;;;;;;;;; FIX ;;;;;;;;;;;;
-  set-default-shape storage-points "container"
-  allocate-storagepoints ; the first storage point is allocated at tick 0
+  ; Set globals
+
   reset-ticks
 end
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;; PORT OF ROTTERDAM PROCEDURES ;;;;;;;
-
-to
-
-end
-
-;;;;; END PORT OF ROTTERDAM PROCEDURES ;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;; GOVERNMENT PROCEDURES ;;;;;;;
 
-to
+; PURPOSE: update electricity price with equation and read price data for oil and CO2 emission from file
+to update-govt-prices
+  ask Government 1 [
+    set electricity-price electricity-price * 0.95
 
+    file-open "co2-oil-price.csv"
+    if file-at-end? [ stop ]
+    let p csv:from-row file-read-line
+    set co2-price item 1 p
+    set oil-price item 2 p
+  ]
 end
 
 ;;;;; END GOVERNMENT PROCEDURES;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;; PORT OF ROTTERDAM PROCEDURES ;;;;;;;
+
+
+
+;;;;; END PORT OF ROTTERDAM PROCEDURES ;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; INDUSTRY PROCEDURES ;;;;;;;
 
-to
+; PURPOSE: update the costs for the industries so that they can decide on intent to build
+to update-expenditures
+  let curr-oil-price [ oil-price ] of Government 1
+  let curr-co2-price [ co2-price ] of Government 1
+  let curr-elec-price [ electricity-price ] of Government 1
+  let curr-opex-extensible [ opex-extensible ] of PoR 0
+  let curr-opex-fixed [ opex-fixed ] of PoR 0
+  ask Industries [
+    set co2-emissions co2-emissions-oil * oil-demand
+    set opex-oil oil-demand * curr-oil-price + co2-emissions * 10 * curr-co2-price
+    set opex-capture-extensible oil-demand * curr-oil-price + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-extensible
+    ;show curr-elec-price * co2-emissions * capture-electricity
+    ;show co2-emissions
+    ;show co2-emissions-oil
+    ;show oil-demand
+    set opex-capture-fixed opex-oil + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-fixed
+    set capex-capture capex-capture * 0.9
+  ]
+end
 
+; PURPOSE: allow industries to decide on their intent to build CCS infrastructure so they can connect to the pipelines of PoR
+to intent-to-build
+  let curr-connection-price [ connection-price ] of PoR 0
+  ask Industries with [not intent] [
+    show opex-oil
+    ;show opex-capture-extensible
+    ;show curr-connection-price
+    ;show capex-capture * co2-emissions / payback-period
+    show opex-capture-extensible + curr-connection-price + capex-capture * co2-emissions / payback-period
+    if opex-oil > opex-capture-extensible + curr-connection-price + capex-capture * co2-emissions / payback-period [
+      set intent True
+    ]
+  ]
+end
+
+; PURPOSE
+to build
+  let curr-pipeline-availability [ connection-price ] of PoR 0
+  let curr-connection-price [ connection-price ] of PoR 0
+  ask Industries with [intent and not built] [
+    if co2-emissions < curr-pipeline-availability [
+      set built True
+      ask PoR 0 [
+        set budget budget + curr-connection-price
+      ]
+      create-Pipeline-with PoR 0
+    ]
+  ]
 end
 
 ;;;;; END INDUSTRY PROCEDURES ;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to go
-  ; decide intent (industries)
-  ; check capacity available vs. requested (PoR)
-  ; Build pipeline if needed and money is sufficient (PoR)
-  ; Act on intent and receive subsidy (industries)
+  update-expenditures
+  intent-to-build
+  build
+  update-govt-prices
+  if ticks = 31 [ stop ]
+  tick
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 0
 0
-439
-460
+1815
+1374
 -1
 -1
 13.0
@@ -156,17 +228,68 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
--16
-16
--16
-16
+-69
+69
+-52
+52
+0
+0
 1
 0
 1
 ticks
 30.0
+
+BUTTON
+40
+41
+104
+74
+Setup
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+40
+86
+103
+119
+GO!
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+135
+198
+212
+231
+Go once
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
