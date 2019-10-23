@@ -160,6 +160,7 @@ to update-expenditures
     set co2-emissions co2-emissions-oil * oil-demand
     set opex-oil oil-demand * curr-oil-price + co2-emissions * curr-co2-price
     set opex-capture-extensible oil-demand * curr-oil-price + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-extensible
+
     set opex-capture-fixed opex-oil + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-fixed
     set capex-capture capex-capture * 0.9
   ]
@@ -169,6 +170,11 @@ end
 to intent-to-build
   let curr-connection-price [ connection-price ] of PoR 0
   ask Industries with [not intent] [
+    show opex-oil
+    ;show opex-capture-extensible
+    ;show curr-connection-price
+    ;show capex-capture * co2-emissions / payback-period
+    show opex-capture-extensible + curr-connection-price + capex-capture * co2-emissions / payback-period
     if opex-oil > opex-capture-extensible + curr-connection-price + capex-capture * co2-emissions / payback-period [
       set intent True
     ]
