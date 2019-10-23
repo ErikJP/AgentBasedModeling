@@ -27,6 +27,7 @@ PoRs-own [
   opex-extensible ; int [eur / ton of CO2] - Price that industries pay to use the extensible pipelines of the PoR
   opex-fixed ; int [eur / ton of CO2] - Price that industries pay to use the fixed pipelines of the PoR
   budget ; int [eur] - Port of Rotterdams budget
+
 ]
 
 Industries-own [
@@ -44,10 +45,17 @@ Industries-own [
   intent ; bool - Industries intent to build CCS (True=intend to build, False=no intent)
   built ; bool - True if an industry has built CCS
   payback-period ; int [yr] - How many years the industry wants to take to payback their investment
+  extensible-connection ; bool - True if industry is connected to extensible pipeline
+  fixed-connection ; bool - True if industry is connected to fixed pipeline
 ]
 
 Storages-own [
-
+  location ; location as mentioned in assignment data
+  pipeline-capacity ; int [Mt co2 / yr] - the maximum capacity of the pipeline
+  onshore-km ; int [km] - required onshore distance
+  offshore-km ; int [km] - required offshore distance
+  capex-onshore ; int [eur / km] - capital expenditure required to lay onshore pipeline per km
+  capex-offshore ; int [eur / km] - capital expenditure required to lay off shore pipeline per km
 ]
 
 Pipelines-own [
@@ -109,6 +117,8 @@ to setup
       set intent False ; bool
       set built False ; bool
       set payback-period random 19 + 1; int [yr]
+      set extensible-connection False
+      set fixed-connection False
   ]]
 
   ; Set globals
@@ -140,7 +150,17 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; PORT OF ROTTERDAM PROCEDURES ;;;;;;;
 
-
+; PURPOSE:
+to build-pipeline
+  let total-emissions sum [ co2-emissions ] of Industries with [intent and not built]
+  write "EMISSIONS"
+  show total-emissions
+  ask PoR 0 [
+    if pipeline-availability < total-emissions and total-emissions > 0 [
+      expand-storage
+    ]
+  ]
+end
 
 ;;;;; END PORT OF ROTTERDAM PROCEDURES ;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -177,26 +197,81 @@ end
 
 ; PURPOSE: Companies decide on whether to build the CCS depending on the available pipeline capacity
 to build
-  let curr-pipeline-availability [ connection-price ] of PoR 0
   let curr-connection-price [ connection-price ] of PoR 0
   ask Industries with [intent and not built] [
+    let curr-pipeline-availability [ pipeline-availability ] of PoR 0
     if co2-emissions < curr-pipeline-availability [
       set built True
+      set extensible-connection True ; NOTE: Add in if statement for fixed or extensible
+      let temp-co2-emissions co2-emissions
       ask PoR 0 [
         set budget budget + curr-connection-price
+        set pipeline-availability pipeline-availability - temp-co2-emissions
       ]
       create-Pipeline-with PoR 0
     ]
   ]
 end
 
+to pay-subscription-to-PoR
+  ask Industries with [ built and extensible-connection ] [
+    ask PoR 0 [
+      set budget budget + opex-extensible * co2-emissions
+    ]
+  ]
+  ask Industries with [ built and fixed-connection ] [
+    set budget budget + opex-fixed * co2-emissions
+  ]
+end
+
 ;;;;; END INDUSTRY PROCEDURES ;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;; STORAGE PROCEDURES ;;;;;;;
+
+; PURPOSE:
+to expand-storage
+  file-open "storagepoints.csv"
+  if file-at-end? [ stop ]
+  let x csv:from-row file-read-line
+  ask n-of 1 patches with [ pycor > pxcor + 60 ] [
+    sprout-Storages 1 [
+      set location item 0 x
+      set pipeline-capacity item 3 x
+      show pipeline-capacity
+      set onshore-km item 1 x
+      set offshore-km item 2 x
+      set capex-onshore item 4 x
+      set capex-offshore item 5 x
+
+      let temp-pipeline-capacity pipeline-capacity
+      let temp-onshore-km onshore-km
+      let temp-offshore-km offshore-km
+      let temp-capex-onshore capex-onshore
+      let temp-capex-offshore capex-offshore
+
+      create-Pipeline-with PoR 0
+
+      ask PoR 0 [
+        set pipeline-availability pipeline-availability + temp-pipeline-capacity
+        let subtract-from-budget temp-onshore-km * temp-capex-onshore + temp-offshore-km * temp-capex-offshore
+        set budget budget - subtract-from-budget
+      ]
+    ]
+  ]
+end
+
+;;;;; END STORAGE PROCEDURES ;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 to go
-  update-expenditures
-  intent-to-build
   build
+  update-expenditures
+  intent-to-blet curr-pipeline-availability [ pipeline-availability ] of PoR 0uild
+  build-pipeline
   update-govt-prices
   if ticks = 31 [ stop ]
   tick
@@ -266,10 +341,10 @@ NIL
 1
 
 BUTTON
-135
-198
-212
-231
+136
+172
+213
+205
 Go once
 go
 NIL
