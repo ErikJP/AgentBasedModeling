@@ -16,6 +16,7 @@ undirected-link-breed [Pipelines Pipeline]
 
 Governments-own [
   subsidy ; int [eur] - Total available subsidy
+  subsidy-for-emissions ; double [eur / ton of CO2] - The amount of subsidy given to industries based on their CO2 emissions (The subsidy is one off)
   co2-price ; int [eur / ton of co2] - Price of CO2 emissions
   oil-price ; int [eur / ton of oil] - Price of oil consumption
   electricity-price ; int [eur / MWh] - Price of electricity
@@ -27,7 +28,6 @@ PoRs-own [
   opex-extensible ; int [eur / ton of CO2] - Price that industries pay to use the extensible pipelines of the PoR
   opex-fixed ; int [eur / ton of CO2] - Price that industries pay to use the fixed pipelines of the PoR
   budget ; int [eur] - Port of Rotterdams budget
-
 ]
 
 Industries-own [
@@ -89,8 +89,14 @@ to setup
   ]
 
   ; Set Government
+  set-default-shape Governments "house"
   create-Governments 1 [
-    set subsidy 15000000 ; int [eur]
+    set color orange
+    set size 8
+    setxy 40 40
+
+    set subsidy total-available-subsidy ; int [eur]
+    set subsidy-for-emissions subsidy-for-industries
     file-open "co2-oil-price.csv"
     if file-at-end? [ stop ]
     let p csv:from-row file-read-line
@@ -100,10 +106,10 @@ to setup
   ]
 
   ; Set Industries
-  set-default-shape industries "house"
+  set-default-shape Industries "house"
   ask n-of 25 patches with [ (pxcor > -40 and pxcor < 20) and (pycor > -15 and pycor < 20) ]
     [ sprout-industries 1 [
-      set color black
+      set color red
       set size 3
 
       set oil-demand random 9000 + 1000; int [ton of oil / yr]
@@ -120,6 +126,9 @@ to setup
       set extensible-connection False
       set fixed-connection False
   ]]
+
+  ; Set Storages
+  set-default-shape Storages "x"
 
   ; Set globals
 
@@ -143,6 +152,23 @@ to update-govt-prices
   ]
 end
 
+; PURPOSE:
+to give-subsidy-to-por
+  let por-subsidy [ subsidy ] of Government 1
+  ask PoR 0 [
+    set budget budget + por-subsidy
+    write "BUDGET AFTER SUBSIDY"
+    show budget
+  ]
+end
+
+  ; PURPOSE:
+to reset-subsidy
+  ask Government 1 [
+    set subsidy total-available-subsidy
+  ]
+end
+
 ;;;;; END GOVERNMENT PROCEDURES;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -153,10 +179,8 @@ end
 ; PURPOSE:
 to build-pipeline
   let total-emissions sum [ co2-emissions ] of Industries with [intent and not built]
-  write "EMISSIONS"
-  show total-emissions
   ask PoR 0 [
-    if pipeline-availability < total-emissions and total-emissions > 0 [
+    if pipeline-availability < total-emissions and total-emissions > 0 and budget > 0 [
       expand-storage
     ]
   ]
@@ -189,8 +213,16 @@ end
 to intent-to-build
   let curr-connection-price [ connection-price ] of PoR 0
   ask Industries with [not intent] [
-    if opex-oil > opex-capture-extensible + curr-connection-price + capex-capture * co2-emissions / payback-period [
+    let emissions-subsidy [ subsidy-for-emissions ] of Government 1
+    let industry-subsidy emissions-subsidy * co2-emissions
+    if opex-oil > opex-capture-extensible + curr-connection-price + capex-capture * co2-emissions / payback-period - industry-subsidy [
       set intent True
+      set color yellow ; Diffenteriate between the types of industries (whether they have no intent to build, have intent, or have already built)
+      ask Government 1 [
+        set subsidy subsidy - industry-subsidy
+        write "LEVEL OF SUBSIDY"
+        show subsidy
+      ]
     ]
   ]
 end
@@ -202,6 +234,7 @@ to build
     let curr-pipeline-availability [ pipeline-availability ] of PoR 0
     if co2-emissions < curr-pipeline-availability [
       set built True
+      set color blue ; An industry is blue if they have intent and then build
       set extensible-connection True ; NOTE: Add in if statement for fixed or extensible
       let temp-co2-emissions co2-emissions
       ask PoR 0 [
@@ -238,9 +271,11 @@ to expand-storage
   let x csv:from-row file-read-line
   ask n-of 1 patches with [ pycor > pxcor + 60 ] [
     sprout-Storages 1 [
+      set color black
+      set size 2
+
       set location item 0 x
       set pipeline-capacity item 3 x
-      show pipeline-capacity
       set onshore-km item 1 x
       set offshore-km item 2 x
       set capex-onshore item 4 x
@@ -268,9 +303,11 @@ end
 
 
 to go
+  reset-subsidy
   build
   update-expenditures
   intent-to-build
+  give-subsidy-to-por
   build-pipeline
   update-govt-prices
   if ticks = 31 [ stop ]
@@ -341,10 +378,10 @@ NIL
 1
 
 BUTTON
-136
-172
-213
-205
+38
+132
+115
+165
 Go once
 go
 NIL
@@ -356,6 +393,36 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+37
+179
+233
+212
+total-available-subsidy
+total-available-subsidy
+0
+30000000
+2.1E7
+1000000
+1
+eur
+HORIZONTAL
+
+SLIDER
+36
+226
+275
+259
+subsidy-for-industries
+subsidy-for-industries
+0
+200
+160.0
+10
+1
+eur/tonCO2
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
