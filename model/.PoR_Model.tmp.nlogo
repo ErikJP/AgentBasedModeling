@@ -201,7 +201,7 @@ to update-kpis
     set total-co2-stored sum [ co2-emissions ] of Industries with [ built ]
     let temp-total-emissions sum [ co2-emissions ] of Industries with [ built ]
     let temp-capture-electricity [ capture-electricity ] of Industry 2
-    set total-electricity-used temp-capture-electricity * temp-total-emissions
+    set total-electricity-used total-electricity-used + temp-capture-electricity * temp-total-emissions
   ]
 end
 
@@ -537,7 +537,7 @@ PLOT
 18
 905
 168
-CO2 Emitted Per Year
+Total CO2 Emitted
 Year
 Ton CO2
 0.0
@@ -593,7 +593,7 @@ PLOT
 350
 518
 500
-Electricity Used Per Year
+Total Electricity Used
 Year
 MWh
 0.0
