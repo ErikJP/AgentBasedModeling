@@ -16,6 +16,7 @@ undirected-link-breed [ Pipelines Pipeline ]
 
 Governments-own [
   subsidy ; int [eur] - Total available subsidy
+  total-subsidy ; int [eur] - Replaces the global slider
   subsidy-for-emissions ; double [eur / ton of CO2] - The amount of subsidy given to industries based on their CO2 emissions (The subsidy is one off)
   co2-price ; int [eur / ton of co2] - Price of CO2 emissions
   oil-price ; int [eur / ton of oil] - Price of oil consumption
@@ -23,6 +24,7 @@ Governments-own [
 
   ; KPIs
   total-co2-emitted-to-air ; int [ton CO2]
+  previous-co2-emitted-to-air ; int [ton CO2]
   total-co2-stored ; int [ton CO2]
   total-industry-costs-to-store-co2 ; int [eur]
   total-subsidy-to-por ; int [eur]
@@ -58,6 +60,10 @@ Industries-own [
   payback-period ; int [yr] - How many years the industry wants to take to payback their investment
   extensible-connection ; bool - True if industry is connected to extensible pipeline
   fixed-connection ; bool - True if industry is connected to fixed pipeline
+  previous-co2-price ; int [eur / ton of co2] - Price of CO2 in previous tick
+  expected-co2-price ; int [eur / ton of co2] - Expected price of CO2 in next tick
+  previous-oil-price ; int [eur / ton of co2] - Price of oil in previous tick
+  expected-oil-price ; int [eur / ton of co2] - Expected price of oil in next tick
 ]
 
 Storages-own [
@@ -117,6 +123,7 @@ to setup
     setxy 40 40
 
     set subsidy total-available-subsidy ; int [eur]
+    set total-subsidy total-available-subsidy
     set subsidy-for-emissions subsidy-for-industries
     file-open "co2-oil-price.csv"
     if file-at-end? [ stop ]
@@ -143,9 +150,13 @@ to setup
       set capex-capture 200 ; int [eur / ton of CO2]
       set intent False ; bool
       set built False ; bool
-      set payback-period random 19 + 1; int [yr]
+      set payback-period random 19 + 1 ; int [yr]
       set extensible-connection False
       set fixed-connection False
+      set previous-co2-price 20
+      set expected-co2-price 20
+      set previous-oil-price 450
+      set expected-oil-price 450
   ]]
 
   ; Set Storages
@@ -168,6 +179,12 @@ to update-govt-prices
     file-open "co2-oil-price.csv"
     if file-at-end? [ stop ]
     let p csv:from-row file-read-line
+    let temp-co2-price co2-price
+    let temp-oil-price oil-price
+    ask Industries [
+      set previous-co2-price temp-co2-price
+      set previous-oil-price temp-oil-price
+    ]
     set co2-price item 1 p
     set oil-price item 2 p
   ]
@@ -181,7 +198,7 @@ to give-subsidy-to-por
     ask Government 1 [
       set total-subsidy-to-por por-subsidy
     ]
-    let temp-yearly-subsidy [ total-available-subsidy ] of Government 1
+    let temp-yearly-subsidy [ total-subsidy ] of Government 1
     ask Government 1 [
       set total-subsidy-to-industries temp-yearly-subsidy - por-subsidy
     ]
@@ -191,7 +208,7 @@ end
   ; PURPOSE:
 to reset-subsidy
   ask Government 1 [
-    set subsidy total-available-subsidy
+    set subsidy total-subsidy
   ]
 end
 
@@ -202,6 +219,27 @@ to update-kpis
     let temp-total-emissions sum [ co2-emissions ] of Industries with [ built ]
     let temp-capture-electricity [ capture-electricity ] of Industry 2
     set total-electricity-used temp-capture-electricity * temp-total-emissions
+  ]
+end
+
+; PURPOSE:
+to get-previous-co2-to-air
+  ask Government 1 [
+    set previous-co2-emitted-to-air sum [ co2-emissions ] of Industries with [ not built ]
+  ]
+end
+
+; PURPOSE:
+to update-subsidy-based-on-target
+  let co2-to-air sum [ co2-emissions ] of Industries with [ not built ]
+  let prev-co2-to-air [ previous-co2-emitted-to-air ] of Government 1
+  let co2-change prev-co2-to-air - co2-to-air
+  let ticks-left 31 - ticks
+  if co2-change * ticks-left - co2-to-air < 0 [
+    ask Government 1 [
+      set total-subsidy total-subsidy + total-subsidy * total-subsidy-increase-for-target / 100
+      set subsidy-for-emissions subsidy-for-emissions + subsidy-for-emissions * industry-subsidy-increase-for-target / 100
+    ]
   ]
 end
 
@@ -257,15 +295,13 @@ end
 
 ; PURPOSE: update the costs for the industries so that they can decide on intent to build
 to update-expenditures
-  let curr-oil-price [ oil-price ] of Government 1
-  let curr-co2-price [ co2-price ] of Government 1
   let curr-elec-price [ electricity-price ] of Government 1
   let curr-opex-extensible [ opex-extensible ] of PoR 0
   let curr-opex-fixed [ opex-fixed ] of PoR 0
   ask Industries [
     set co2-emissions co2-emissions-oil * oil-demand
-    set opex-oil oil-demand * curr-oil-price + co2-emissions * curr-co2-price
-    set opex-capture-extensible oil-demand * curr-oil-price + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-extensible
+    set opex-oil oil-demand * expected-oil-price + co2-emissions * expected-co2-price
+    set opex-capture-extensible oil-demand * expected-oil-price + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-extensible
     set opex-capture-fixed opex-oil + curr-elec-price * co2-emissions * capture-electricity + co2-emissions * curr-opex-fixed
     set capex-capture capex-capture * 0.9
   ]
@@ -273,6 +309,7 @@ end
 
 ; PURPOSE: allow industries to decide on their intent to build CCS infrastructure so they can connect to the pipelines of PoR
 to intent-to-build
+  update-expectations
   let curr-connection-price [ connection-price ] of PoR 0
   ask Industries with [ not intent ] [
     let emissions-subsidy [ subsidy-for-emissions ] of Government 1
@@ -313,6 +350,7 @@ to build
   ]
 end
 
+; PURPOSE:
 to pay-subscription-to-PoR
   ask Industries with [ built and extensible-connection ] [
     let temp-co2-emissions co2-emissions
@@ -337,6 +375,16 @@ to pay-subscription-to-PoR
         set total-industry-costs-to-store-co2 total-industry-costs-to-store-co2 + emissions-cost + elec-price * temp-capture-electricity * temp-co2-emissions
       ]
     ]
+  ]
+end
+
+; PURPOSE:
+to update-expectations
+  ask Industries [
+    let curr-co2-price [ co2-price ] of Government 1
+    set expected-co2-price curr-co2-price * curr-co2-price / previous-co2-price
+    let curr-oil-price [ oil-price ] of Government 1
+    set expected-oil-price curr-oil-price * curr-oil-price / previous-oil-price
   ]
 end
 
@@ -390,6 +438,8 @@ end
 
 
 to go
+  if ticks > 1 [ update-subsidy-based-on-target ]
+  update-subsidy-based-on-target
   reset-subsidy
   build
   update-availability-if-fixed
@@ -400,6 +450,7 @@ to go
   update-govt-prices
   update-kpis
   pay-subscription-to-PoR
+  get-previous-co2-to-air
   if ticks = 31 [ stop ]
   tick
 end
@@ -493,7 +544,7 @@ total-available-subsidy
 total-available-subsidy
 0
 100000000
-1.0E8
+1.0E7
 5000000
 1
 eur
@@ -508,7 +559,7 @@ subsidy-for-industries
 subsidy-for-industries
 0
 200
-200.0
+90.0
 5
 1
 eur/tonCO2
@@ -605,6 +656,36 @@ false
 "" ""
 PENS
 "Total Electricity" 1.0 0 -16777216 true "" "plot [ total-electricity-used ] of Government 1"
+
+SLIDER
+37
+274
+278
+307
+total-subsidy-increase-for-target
+total-subsidy-increase-for-target
+0
+15
+6.0
+1
+1
+%
+HORIZONTAL
+
+SLIDER
+38
+323
+311
+356
+industry-subsidy-increase-for-target
+industry-subsidy-increase-for-target
+0
+15
+1.0
+1
+1
+%
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
