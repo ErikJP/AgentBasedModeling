@@ -5,7 +5,8 @@ extensions [
 
 
 globals [
-
+  total-co2-emitted-to-air-global ; global var
+  total-co2-stored-global
 ]
 
 breed [ Governments Government ]
@@ -379,7 +380,7 @@ to pay-subscription-to-PoR
 end
 
 ; PURPOSE:
-to update-expectations
+to update-expectations ; CONSIDER THE MEMORY DEPTH HERE
   ask Industries [
     let curr-co2-price [ co2-price ] of Government 1
     set expected-co2-price curr-co2-price * curr-co2-price / previous-co2-price
@@ -437,6 +438,18 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;; PROCEDURES FOR PYNETLOGO ;;;;;;;
+
+to update-pynetlogo-globals
+  set total-co2-emitted-to-air-global sum [ total-co2-emitted-to-air ] of Governments
+  set total-co2-stored-global sum [ total-co2-stored ] of Governments
+end
+
+;;;;; END PROCEDURES FOR PYNETLOGO ;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 to go
   if ticks > 1 [ update-subsidy-based-on-target ]
   update-subsidy-based-on-target
@@ -451,6 +464,7 @@ to go
   update-kpis
   pay-subscription-to-PoR
   get-previous-co2-to-air
+  update-pynetlogo-globals
   if ticks = 31 [ stop ]
   tick
 end
@@ -544,7 +558,7 @@ total-available-subsidy
 total-available-subsidy
 0
 100000000
-1.0E7
+5.0E7
 5000000
 1
 eur
@@ -559,7 +573,7 @@ subsidy-for-industries
 subsidy-for-industries
 0
 200
-90.0
+65.0
 5
 1
 eur/tonCO2
@@ -666,7 +680,7 @@ total-subsidy-increase-for-target
 total-subsidy-increase-for-target
 0
 15
-6.0
+4.0
 1
 1
 %
