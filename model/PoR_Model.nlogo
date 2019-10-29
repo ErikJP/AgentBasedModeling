@@ -32,6 +32,8 @@ extensions [
 globals [
   total-co2-emitted-to-air-global ; global var
   total-co2-stored-global
+  total-subsidy-to-por-global
+  total-subsidy-to-industries-global
 ]
 
 breed [ Governments Government ]
@@ -474,6 +476,9 @@ end
 to update-pynetlogo-globals
   set total-co2-emitted-to-air-global sum [ total-co2-emitted-to-air ] of Governments
   set total-co2-stored-global sum [ total-co2-stored ] of Governments
+  set total-subsidy-to-por-global sum [ total-subsidy-to-por ] of Governments
+  set total-subsidy-to-industries-global sum [ total-subsidy-to-industries ] of Governments
+
 end
 
 ;;;;; END PROCEDURES FOR PYNETLOGO ;;;;;

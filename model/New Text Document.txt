@@ -1,0 +1,7 @@
+memory depth - now: 2 ticks 
+maybe? randomly assigned per industry
+
+- is this correlated to payback period? 
+
+memory -> what effect does it have? 
+
