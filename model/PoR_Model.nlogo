@@ -1,3 +1,26 @@
+; Port of Rotterdam CCS Project for SEN1211
+; Authors: Erik Pronk | Philip Seijger | Irene van Droffelaar
+;
+; Notes on running the model:
+;   1) Open model in NetLogo 3D
+;   2) Go to interface tab
+;   3) Adjust sliders as necessary. The base case is (sliders from top to bottom, respectively): 50,000,000; 100; 2.0; 2.0;
+;      and 10.0
+;   4) Click setup
+;   5) Click "Go!" to run to tick 31 and click "Go once" to advance tick by tick
+;   6) Note that in NetLogo 3D, the visualization appears in a separate window
+;
+; Additional notes on the visualization
+;   - The large orange house represents the government, but they donot have any additional function in the visualization
+;   - The large yellow house represents the Port of Rotterdam and is where all pipelines either start or end
+;   - The grey lines are pipelines
+;   - The black x's are the storage points (randomly sprouted locations)
+;   - The small houses are randomly sprouted industries where:
+;     - Red indicates an industry with no intent to connect to CCS (and is not yet connected)
+;     - Yellow indicates an industry with intent to build but has not yet due to insufficent available capacity
+;     - Blue indcates an industry that has successfully connected to the CCS infrastructure
+
+
 extensions [
   csv
   matrix
@@ -101,10 +124,8 @@ to setup
 
     set connection-price 1000000 ; [eur]
     set pipeline-availability 0 ; double [ton of CO2 / yr]
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; FIX BACK TO 0.3 and 0.21
-    set opex-extensible 0.3 ; int [eur / ton of CO2]
-    set opex-fixed 0.21 ; int [eur / ton of CO2] (0.7*opex-extensible)
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    set opex-extensible extensible-storage-price ; int [eur / ton of CO2]
+    set opex-fixed 0.7 * extensible-storage-price ; int [eur / ton of CO2] (0.7*opex-extensible)
     set budget 10000000 ; int [eur]
 
     file-open "pipeline-price.csv"
@@ -154,16 +175,14 @@ to setup
       set payback-period random 19 + 1 ; int [yr]
       set extensible-connection False
       set fixed-connection False
-      set previous-co2-price 20
-      set expected-co2-price 20
-      set previous-oil-price 450
-      set expected-oil-price 450
+      set previous-co2-price 20 ; int [eur]
+      set expected-co2-price 20 ; int [eur]
+      set previous-oil-price 450 ; int [eur]
+      set expected-oil-price 450 ; int [eur]
   ]]
 
   ; Set Storages
   set-default-shape Storages "x"
-
-  ; Set globals
 
   reset-ticks
 end
@@ -191,7 +210,7 @@ to update-govt-prices
   ]
 end
 
-; PURPOSE:
+; PURPOSE: government gives the remaining subsidy (unused by industry) to the PoR's budget
 to give-subsidy-to-por
   let por-subsidy [ subsidy ] of Government 1
   ask PoR 0 [
@@ -206,13 +225,15 @@ to give-subsidy-to-por
   ]
 end
 
-  ; PURPOSE:
+; PURPOSE: used to reset the available subsidy for a tick to the yearly subsidy level
 to reset-subsidy
   ask Government 1 [
     set subsidy total-subsidy
   ]
 end
 
+; PURPOSE: update the KPIs that can not be easily updated in other functions (some KPIs are updated in other functions
+;          where it makes more sense
 to update-kpis
   ask Government 1 [
     set total-co2-emitted-to-air sum [ co2-emissions ] of Industries with [ not built ]
@@ -223,14 +244,15 @@ to update-kpis
   ]
 end
 
-; PURPOSE:
+; PURPOSE: get the CO2 emitted to the air by industries from the current tick to be used in the next tick
 to get-previous-co2-to-air
   ask Government 1 [
     set previous-co2-emitted-to-air sum [ co2-emissions ] of Industries with [ not built ]
   ]
 end
 
-; PURPOSE:
+; PURPOSE: bonus assignement function to increase (if necessary) the total available subsidy for the next year and
+;          the subsidy given per ton of CO2 emissions to the PoR.
 to update-subsidy-based-on-target
   let co2-to-air sum [ co2-emissions ] of Industries with [ not built ]
   let prev-co2-to-air [ previous-co2-emitted-to-air ] of Government 1
@@ -251,7 +273,9 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; PORT OF ROTTERDAM PROCEDURES ;;;;;;;
 
-; PURPOSE:
+; PURPOSE: PoR decides on whether or not the currently unused capacity is sufficient for the capacity needed by industries
+;          who want to use the CCS infrastructure. PoR will build a pipeline if their is not enough unused pipeline capacity.
+;          The choice of extensible vs. fixed is made based on if 70% of the capacity will be used or not.
 to build-pipeline
   let total-emissions sum [ co2-emissions ] of Industries with [ intent and not built ]
   ask PoR 0 [
@@ -269,7 +293,8 @@ to build-pipeline
   ]
 end
 
-; PURPOSE:
+; PURPOSE: The price of the next pipeline that can be built is set so that the government can check whether or not their
+;          budget suffices
 to update-next-pipeline-price
   file-open "pipeline-price.csv"
   if file-at-end? [ stop ]
@@ -332,7 +357,7 @@ to build
       set color blue ; An industry is blue if they have intent and then build
       let pipe-type-fixed [ previous-pipeline-fixed ] of PoR 0
       ifelse not pipe-type-fixed [ ; PREVIOUS PIPLEINE IS EXTENSIBLE
-        set extensible-connection True ; NOTE: Add in if statement for fixed or extensible
+        set extensible-connection True
       ] [ ; PREVIOUS PIPELINE IS FIXED
         set fixed-connection True
       ]
@@ -351,7 +376,8 @@ to build
   ]
 end
 
-; PURPOSE:
+; PURPOSE: the industries that are connected to the CCS infrastructure are asked to pay the yearly fee for their usage of the
+;          storage facilities
 to pay-subscription-to-PoR
   ask Industries with [ built and extensible-connection ] [
     let temp-co2-emissions co2-emissions
@@ -379,8 +405,9 @@ to pay-subscription-to-PoR
   ]
 end
 
-; PURPOSE:
-to update-expectations ; CONSIDER THE MEMORY DEPTH HERE
+; PURPOSE: industries update what their expectations of the next year's price of CO2 emissions. Industries only look back in
+;          time two ticks such that they consider short term price movements over long term trends.
+to update-expectations
   ask Industries [
     let curr-co2-price [ co2-price ] of Government 1
     set expected-co2-price curr-co2-price * curr-co2-price / previous-co2-price
@@ -394,9 +421,9 @@ end
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;; STORAGE PROCEDURES ;;;;;;;
+;;;;;;; STORAGE PROCEDURES ;;;;;;;;
 
-; PURPOSE:
+; PURPOSE: the storages are sprouted in this function and a pipeline is drawn to the PoR in the visualization.
 to expand-storage
   file-open "storagepoints.csv"
   if file-at-end? [ stop ]
@@ -434,13 +461,14 @@ to expand-storage
   ]
 end
 
-;;;;; END STORAGE PROCEDURES ;;;;;
+;;;;; END STORAGE PROCEDURES ;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;; PROCEDURES FOR PYNETLOGO ;;;;;;;
 
+; PURPOSE: update global variables used  by pynetlogo
 to update-pynetlogo-globals
   set total-co2-emitted-to-air-global sum [ total-co2-emitted-to-air ] of Governments
   set total-co2-stored-global sum [ total-co2-stored ] of Governments
@@ -448,7 +476,6 @@ end
 
 ;;;;; END PROCEDURES FOR PYNETLOGO ;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 to go
   if ticks > 1 [ update-subsidy-based-on-target ]
@@ -470,13 +497,13 @@ to go
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-0
-0
-1815
-1374
+940
+20
+1641
+553
 -1
 -1
-13.0
+4.9905
 1
 10
 1
@@ -491,8 +518,6 @@ GRAPHICS-WINDOW
 -52
 52
 0
-0
-1
 0
 1
 ticks
@@ -573,7 +598,7 @@ subsidy-for-industries
 subsidy-for-industries
 0
 200
-65.0
+100.0
 5
 1
 eur/tonCO2
@@ -680,8 +705,8 @@ total-subsidy-increase-for-target
 total-subsidy-increase-for-target
 0
 15
-4.0
-1
+2.0
+0.5
 1
 %
 HORIZONTAL
@@ -695,10 +720,25 @@ industry-subsidy-increase-for-target
 industry-subsidy-increase-for-target
 0
 15
-1.0
-1
+2.0
+0.5
 1
 %
+HORIZONTAL
+
+SLIDER
+38
+369
+292
+402
+extensible-storage-price
+extensible-storage-price
+0
+50
+10.0
+0.2
+1
+eur/tonCO2
 HORIZONTAL
 
 @#$#@#$#@
@@ -1043,7 +1083,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 3D 6.1.0
+NetLogo 6.1.0
 @#$#@#$#@
 need-to-manually-make-preview-for-this-model
 @#$#@#$#@
