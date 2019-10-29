@@ -754,7 +754,8 @@ Authors: Erik Pronk | Philip Seijger | Irene van Droffelaar
 ## Notes on running the model:
   1. Open model in NetLogo (2D or 3D)
   2. Go to interface tab
-  3. Adjust sliders as necessary. The base case is (sliders from top to bottom, respectively): 50,000,000; 100; 2.0; 2.0; and 10.0
+  3. Adjust sliders as necessary. The base case is (sliders from top to bottom, respectively): 50,000,000; 100; 2.0; 2.0;
+and 10.0
   4. Click setup
   5. Click "Go!" to run to tick 31 and click "Go once" to advance tick by tick
   6. Note that in NetLogo 3D, the visualization appears in a separate window
