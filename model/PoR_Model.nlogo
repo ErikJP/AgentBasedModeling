@@ -96,7 +96,7 @@ Industries-own [
 
 Storages-own [
   location ; location as mentioned in assignment data
-  pipeline-capacity ; int [Mt co2 / yr] - the maximum capacity of the pipeline
+  pipeline-capacity ; int [ton co2 / yr] - the maximum capacity of the pipeline
   onshore-km ; int [km] - required onshore distance
   offshore-km ; int [km] - required offshore distance
   capex-onshore ; int [eur / km] - capital expenditure required to lay onshore pipeline per km
