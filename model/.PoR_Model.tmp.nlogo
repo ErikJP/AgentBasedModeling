@@ -480,10 +480,10 @@ end
 
 ; PURPOSE: update global variables used  by pynetlogo
 to update-pynetlogo-globals
-  set lastvalue-co2-emitted-to-air-global sum [ total-co2-emitted-to-air ] of Governments
-  set sum-co2-emitted-to-air-global sum-co2-emitted-to-air-global + sum [ total-co2-emitted-to-air ] of Governments; int [ton of CO2]
-  set sum-subsidy-to-por-global sum-subsidy-to-por-global + sum [ total-subsidy-to-por ] of Governments;; int [eur]
-  set sum-subsidy-to-industries-global sum-subsidy-to-industries-global + sum [ total-subsidy-to-industries ] of Governments ; int [eur]
+  set lastvalue-co2-emitted-to-air-global s[ total-co2-emitted-to-air ] of Governments
+  set sum-co2-emitted-to-air-global sum-co2-emitted-to-air-global + [ total-co2-emitted-to-air ] of Governments; int [ton of CO2]
+  set sum-subsidy-to-por-global sum-subsidy-to-por-global + [ total-subsidy-to-por ] of Governments;; int [eur]
+  set sum-subsidy-to-industries-global sum-subsidy-to-industries-global + [ total-subsidy-to-industries ] of Governments ; int [eur]
 end
 
 ;;;;; END PROCEDURES FOR PYNETLOGO ;;;;;
