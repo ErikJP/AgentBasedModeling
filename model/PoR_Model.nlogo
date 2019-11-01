@@ -307,7 +307,8 @@ to update-next-pipeline-price
   set next-pipeline-capacity item 4 pr
 end
 
-; PURPOSE: reset availability if the previously built pipeline is fixed
+; PURPOSE: reset availability if the previously built pipeline is fixed (Otherwise, the availability is kept because of
+;          extensibility)
 to update-availability-if-fixed
   ask PoR 0 [
     if previous-pipeline-fixed [
