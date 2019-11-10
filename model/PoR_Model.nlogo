@@ -34,6 +34,7 @@ globals [ ; Globals are generally used for the connection with PyNetLogo
   sum-co2-emitted-to-air-global ; int [ton of CO2]
   sum-subsidy-to-por-global ; int [eur]
   sum-subsidy-to-industries-global ; int [eur]
+  sum-total-co2-stored ; int [ton of CO2]
 ]
 
 breed [ Governments Government ]
@@ -192,6 +193,7 @@ to setup
   set sum-co2-emitted-to-air-global 0 ; int [ton of CO2]
   set sum-subsidy-to-por-global 0 ; int [eur]
   set sum-subsidy-to-industries-global 0 ; int [eur]
+  set sum-total-co2-stored 0 ; int [ton of CO2]
 
   reset-ticks
 end
@@ -484,6 +486,7 @@ to update-pynetlogo-globals
   set sum-co2-emitted-to-air-global sum-co2-emitted-to-air-global + sum [ total-co2-emitted-to-air ] of Governments; int [ton of CO2]
   set sum-subsidy-to-por-global sum-subsidy-to-por-global + sum [ total-subsidy-to-por ] of Governments;; int [eur]
   set sum-subsidy-to-industries-global sum-subsidy-to-industries-global + sum [ total-subsidy-to-industries ] of Governments ; int [eur]
+  set sum-total-co2-stored sum-total-co2-stored + sum [ total-co2-stored ] of Governments ; int [ton of CO2]
 end
 
 ;;;;; END PROCEDURES FOR PYNETLOGO ;;;;;
